@@ -6,6 +6,7 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.comments.BlockComment;
 import com.github.javaparser.ast.nodeTypes.NodeWithName;
+import com.github.javaparser.symbolsolver.resolution.typesolvers.JarTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import es.upv.mist.slicing.graphs.augmented.ASDG;
 import es.upv.mist.slicing.graphs.augmented.PSDG;
@@ -21,12 +22,15 @@ import org.apache.commons.cli.*;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Slicer {
@@ -90,9 +94,15 @@ public class Slicer {
                 .builder("h").longOpt("help")
                 .desc("Shows this text")
                 .build());
+        OPTIONS.addOption(Option
+                .builder("j").longOpt("jar-dependencies")
+                .hasArgs().argName("\"lib/*[:jar:jar:...]\"").valueSeparator(':')
+                .desc("The lib or jar that contained from third party.")
+                .build());
     }
 
     private final Set<File> dirIncludeSet = new HashSet<>();
+    private final List<String> jarIncludeList = new ArrayList<>();
     private File outputDir = DEFAULT_OUTPUT_DIR;
     private File scFile;
     private int scLine;
@@ -130,6 +140,46 @@ public class Slicer {
                 if (!dir.isDirectory())
                     throw new ParseException("One of the include directories is not a directory or isn't accesible: " + str);
                 dirIncludeSet.add(dir);
+            }
+        }
+
+        if (cliOpts.hasOption('j')) {
+            for (String str : cliOpts.getOptionValues('j')) {
+                File file = new File(str);
+
+                // 处理JAR文件
+                if (str.toLowerCase().endsWith(".jar") && file.isFile()) {
+                    jarIncludeList.add(file.getAbsolutePath());
+                }
+                // 处理目录中的JAR文件
+                else if (file.isDirectory()) {
+                    File[] jars = file.listFiles(
+                            f -> f.isFile() && f.getName().toLowerCase().endsWith(".jar")
+                    );
+                    if (jars != null) {
+                        jarIncludeList.addAll(
+                                Arrays.stream(jars)
+                                        .map(File::getAbsolutePath)
+                                        .collect(Collectors.toList())
+                        );
+                    }
+                }
+                // 处理通配符（如 lib/*）
+                else if (str.endsWith("*")) {
+                    File dir = new File(str.substring(0, str.length() - 1));
+                    if (dir.isDirectory()) {
+                        File[] jars = dir.listFiles(
+                                f -> f.isFile() && f.getName().toLowerCase().endsWith(".jar")
+                        );
+                        if (jars != null) {
+                            jarIncludeList.addAll(
+                                    Arrays.stream(jars)
+                                            .map(File::getAbsolutePath)
+                                            .collect(Collectors.toList())
+                            );
+                        }
+                    }
+                }
             }
         }
     }
@@ -171,11 +221,19 @@ public class Slicer {
         return scVar;
     }
 
-    public void slice() throws ParseException {
+    public void slice() throws ParseException, IOException {
         // Configure JavaParser
         StaticJavaParser.getConfiguration().setAttributeComments(false);
         Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).log(Level.INFO, "Configuring JavaParser");
         StaticTypeSolver.addTypeSolverJRE();
+        for (int i = 0; i < jarIncludeList.size(); i++) {
+            try{
+                StaticTypeSolver.addTypeSolver(new JarTypeSolver(Paths.get(jarIncludeList.get(i))));
+                System.out.println("add " + jarIncludeList.get(i));
+            } catch (Exception e){
+                e.printStackTrace();
+            }
+        }
         for (File directory : dirIncludeSet)
             StaticTypeSolver.addTypeSolver(new JavaParserTypeSolver(directory));
 
@@ -286,6 +344,8 @@ public class Slicer {
             new Slicer(args).slice();
         } catch (ParseException e) {
             System.err.println("Error parsing the arguments!\n" + e.getMessage());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 }

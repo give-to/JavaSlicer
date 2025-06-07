@@ -141,9 +141,17 @@ public class SDG extends Graph implements Sliceable, Buildable<NodeList<Compilat
                     if (n.isAbstract() || isInInterface)
                         return; // Allow abstract methods
                     CFG cfg = createCFG();
-                    buildCFG(n, cfg);
-                    cfgMap.put(n, cfg);
-                    super.visit(n, arg);
+                    try {
+                        buildCFG(n, cfg);
+                        cfgMap.put(n, cfg);
+                    }catch (Exception e){
+                        System.out.println(e);
+                    }
+                    try {
+                        super.visit(n, arg);
+                    }catch (Exception e){
+                        System.out.println(e);
+                    }
                 }
 
                 @Override
@@ -153,9 +161,17 @@ public class SDG extends Graph implements Sliceable, Buildable<NodeList<Compilat
                     if (n.isAbstract() || isInInterface)
                         return; // Allow abstract methods
                     CFG cfg = createCFG();
-                    buildCFG(n, cfg);
-                    cfgMap.put(n, cfg);
-                    super.visit(n, arg);
+                    try {
+                        buildCFG(n, cfg);
+                        cfgMap.put(n, cfg);
+                    }catch (Exception e){
+                        System.out.println(e);
+                    }
+                    try {
+                        super.visit(n, arg);
+                    }catch (Exception e){
+                        System.out.println(e);
+                    }
                 }
             }, null);
         }

@@ -194,10 +194,11 @@ public class ESCFG extends ACFG {
             stmtStack.push(n);
             tryStack.push(n);
             tryNonExecHangingStack.push(new HashSet<>());
-            if (n.getResources().isNonEmpty())
-                throw new IllegalStateException("try-with-resources is not supported");
-            if (n.getFinallyBlock().isPresent())
-                throw new IllegalStateException("try-finally is not supported");
+            if (n.getResources().isNonEmpty()) return;
+//                throw new IllegalStateException("try-with-resources is not supported");
+            if (n.getFinallyBlock().isPresent()) return;
+//                throw new IllegalStateException("try-finally is not supported");
+
             GraphNode<TryStmt> node = connectTo(n, "try");
             n.getTryBlock().accept(this, arg);
             List<GraphNode<?>> hanging = new LinkedList<>(hangingNodes);
